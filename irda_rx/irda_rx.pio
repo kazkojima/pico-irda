@@ -1,4 +1,6 @@
 ;
+; Copyright (c) 2022 Kaz Kojima <kkojima@rr.iij4u.or.jp>
+;
 ; SPDX-License-Identifier: BSD-3-Clause
 ;
 
@@ -47,14 +49,6 @@ static inline void irda_rx_program_init(PIO pio, uint sm, uint offset, uint pin,
     pio_sm_exec(pio, sm, pio_encode_pull(false, false));
     pio_sm_exec(pio, sm, pio_encode_mov(pio_y, pio_osr));
     pio_sm_set_enabled(pio, sm, true);
-}
-
-static inline uint irda_rx_program_getu32(PIO pio, uint sm) {
-    // 32-bit read from the FIFO
-    io_rw_32 *rxfifo = (io_rw_32*)&pio->rxf[sm];
-    while (pio_sm_is_rx_fifo_empty(pio, sm))
-        tight_loop_contents();
-    return *rxfifo;
 }
 
 %}

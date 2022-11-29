@@ -1,4 +1,6 @@
 /**
+ * Copyright (c) 2022 Kaz Kojima <kkojima@rr.iij4u.or.jp>
+ *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
@@ -117,7 +119,6 @@ static void samples_ready_handler(void) {
 	        // error
 	        sample_error_count++;
 		error_sample = u;
-	        // printf("\n[error:%04x]\n", u);
 		decode = false;
 		continue;
 	    }
@@ -196,48 +197,4 @@ int main() {
             printf("%c", char_fifo_read());
         }
     }
-
-#if defined(POLLING)
-    bool decode = false;
-    uint bidx;
-    char ch;
-    bool left = true;
-    uint16_t u;
-    uint uu;
-
-    while (true) {
-	if (left) {
-	    uu = irda_rx_program_getu32(pio, sm);
-	    u = uu >> 16;
-	} else {
-	  u = (uint16_t)uu;
-	}
-	left = !left;
-
-	if (u == 0x0) {
-	    bidx = 0;
-	    ch = 0;
-	    decode = true;
-	} else if (decode) {
-	    if (u == 0xffff) {
-	        if (bidx > 7) {
-		    decode = false;
-		    printf("%c", ch);
-		    continue;
-		} 
-	        ch |= 1 << bidx;
-		bidx++;
-	    } else if (u == 0xff1f || u == 0xff9f || u == 0xff8f) {
-	        bidx++;
-	    } else {
-	        // error
-	        printf("\n[error:%04x]\n", u);
-		decode = false;
-		continue;
-	    }
-	}
-        //print_capture_u16(u);
-	//printf("%04x\n", u);
-    }
-#endif
 }
