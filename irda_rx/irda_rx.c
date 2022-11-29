@@ -193,7 +193,7 @@ int main() {
 	    sample_error_count = 0;
 	    printf("\n[%04x]\n", error_sample);
 	}
-        if (!char_fifo_empty()) {
+        while (!char_fifo_empty()) {
             printf("%c", char_fifo_read());
         }
     }
