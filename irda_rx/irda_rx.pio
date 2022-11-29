@@ -1,0 +1,60 @@
+;
+; SPDX-License-Identifier: BSD-3-Clause
+;
+
+.program irda_rx
+
+; Simple 8n1 IrDA low speed receiver which catches start bits and
+; get samples from input pin for a given count.
+; IN pin 0 and JMP pin are both mapped to the GPIO used as IrDA RX.
+
+.wrap_target
+    mov x, y
+start:
+    wait 0 pin 0 [3]    ; Stall until start bit is asserted
+    jmp pin start [2]   ; pin should be low for 2-6 clocks
+    jmp pin mark        ; and should be high at the 7th clock
+    jmp start
+mark:
+    in null, 16 [7]     ; Mark start
+sample:                 ; The first sampled bit (16 cycles elapsed)
+    in pins, 1          ; Shift data bit into ISR
+    jmp x-- sample      ; Loop Y+1 times, each loop iteration is 2 cycles
+.wrap
+
+% c-sdk {
+#include "hardware/clocks.h"
+#include "hardware/gpio.h"
+
+static inline void irda_rx_program_init(PIO pio, uint sm, uint offset, uint pin, uint baud) {
+    const uint n_samples = 9*16;
+    pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, false);
+    pio_gpio_init(pio, pin);
+    gpio_pull_up(pin);
+
+    pio_sm_config c = irda_rx_program_get_default_config(offset);
+    sm_config_set_in_pins(&c, pin); // for WAIT, IN
+    sm_config_set_jmp_pin(&c, pin); // for JMP
+    // Shift to left, autopush enabled
+    sm_config_set_in_shift(&c, false, true, 32);
+
+    // 1 bit IrDA cycle = 32 execution cycles
+    float div = (float)clock_get_hz(clk_sys) / (32 * baud);
+    sm_config_set_clkdiv(&c, div);
+
+    pio_sm_init(pio, sm, offset, &c);
+    pio_sm_put_blocking(pio, sm, n_samples - 1);
+    pio_sm_exec(pio, sm, pio_encode_pull(false, false));
+    pio_sm_exec(pio, sm, pio_encode_mov(pio_y, pio_osr));
+    pio_sm_set_enabled(pio, sm, true);
+}
+
+static inline uint irda_rx_program_getu32(PIO pio, uint sm) {
+    // 32-bit read from the FIFO
+    io_rw_32 *rxfifo = (io_rw_32*)&pio->rxf[sm];
+    while (pio_sm_is_rx_fifo_empty(pio, sm))
+        tight_loop_contents();
+    return *rxfifo;
+}
+
+%}
